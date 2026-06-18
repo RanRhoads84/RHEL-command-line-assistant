@@ -1,0 +1,82 @@
+# Maintainer: Your Name <your@email.com>
+pkgname=command-line-assistant
+pkgver=0.5.1
+pkgrel=1
+pkgdesc="AI-powered command-line assistant backed by a local LLM (Ollama/llama.cpp)"
+arch=('any')
+url="https://github.com/rhel-lightspeed/command-line-assistant"
+license=('Apache-2.0')
+depends=(
+    'python'
+    'python-requests'
+    'python-markdown'
+    'python-sqlalchemy'
+    'python-dasbus'
+    'python-gobject'
+    'dbus'
+)
+makedepends=(
+    'python-build'
+    'python-installer'
+    'python-setuptools'
+    'python-wheel'
+)
+optdepends=(
+    'python-tomli: Python < 3.11 compatibility'
+    'ollama: local LLM backend (recommended)'
+    'python-psycopg2: PostgreSQL database support'
+    'mysql-python: MySQL/MariaDB database support'
+)
+backup=('etc/xdg/command-line-assistant/config.toml')
+source=("$pkgname::git+${url}.git")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+
+    # Install the Python package
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # systemd service
+    install -Dm644 data/release/systemd/clad.service \
+        "$pkgdir/usr/lib/systemd/system/clad.service"
+
+    # tmpfiles.d for /var/lib/command-line-assistant
+    install -Dm644 data/release/systemd/clad.tmpfiles.conf \
+        "$pkgdir/usr/lib/tmpfiles.d/command-line-assistant.conf"
+
+    # D-Bus system policy
+    install -Dm644 data/release/dbus/com.redhat.lightspeed.conf \
+        "$pkgdir/usr/share/dbus-1/system.d/com.redhat.lightspeed.conf"
+
+    # D-Bus service activation files
+    install -Dm644 data/release/dbus/com.redhat.lightspeed.chat.service \
+        "$pkgdir/usr/share/dbus-1/system-services/com.redhat.lightspeed.chat.service"
+    install -Dm644 data/release/dbus/com.redhat.lightspeed.history.service \
+        "$pkgdir/usr/share/dbus-1/system-services/com.redhat.lightspeed.history.service"
+    install -Dm644 data/release/dbus/com.redhat.lightspeed.user.service \
+        "$pkgdir/usr/share/dbus-1/system-services/com.redhat.lightspeed.user.service"
+
+    # Default config
+    install -Dm644 data/release/xdg/config.toml \
+        "$pkgdir/etc/xdg/command-line-assistant/config.toml"
+
+    # Man pages
+    install -Dm644 data/release/man/c.1 \
+        "$pkgdir/usr/share/man/man1/c.1"
+    install -Dm644 data/release/man/clad.8 \
+        "$pkgdir/usr/share/man/man8/clad.8"
+}
+
+post_install() {
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/command-line-assistant.conf
+    echo "To start the daemon:  systemctl enable --now clad"
+    echo "Edit config:          /etc/xdg/command-line-assistant/config.toml"
+    echo "Default backend:      Ollama at http://localhost:11434/v1"
+    echo "Install Ollama:       yay -S ollama && systemctl enable --now ollama"
+}

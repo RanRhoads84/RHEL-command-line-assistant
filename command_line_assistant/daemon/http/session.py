@@ -42,6 +42,13 @@ def get_session(config: Config) -> Session:
 
     session.mount(config.backend.endpoint, retry_adapter)
 
-    session.cert = (config.backend.auth.cert_file, config.backend.auth.key_file)  # type: ignore
+    session.verify = config.backend.auth.verify_ssl
+
+    auth_type = config.backend.auth.auth_type
+    if auth_type == "cert":
+        session.cert = (config.backend.auth.cert_file, config.backend.auth.key_file)  # type: ignore
+    elif auth_type == "token" and config.backend.auth.api_key:
+        session.headers["Authorization"] = f"Bearer {config.backend.auth.api_key}"
+    # auth_type == "none": no credentials attached
 
     return session

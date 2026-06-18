@@ -5,11 +5,12 @@ Description=Command Line Assistant Daemon Service
 # Points to documentation
 Documentation=man:clad(8)
 
-# Ensures this service starts after network is fully online and D-Bus is available
+# Ensures this service starts after D-Bus is available
+# network-online is wanted but not required for local backends
 After=network-online.service dbus.service
 
-# Makes network connectivity a hard requirement for this service
-Requires=network-online.target
+# Soft network dependency so service still starts when offline (local backend)
+Wants=network-online.target
 
 [Service]
 # Specifies the service is a simple, long-running process

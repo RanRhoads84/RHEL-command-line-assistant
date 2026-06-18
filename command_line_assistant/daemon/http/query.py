@@ -7,6 +7,7 @@ from json.decoder import JSONDecodeError
 from requests import RequestException, Response
 
 from command_line_assistant.config import Config
+from command_line_assistant.daemon.http.openai import from_openai_response, to_openai_payload
 from command_line_assistant.daemon.http.session import get_session
 from command_line_assistant.dbus.exceptions import RequestFailedError
 
@@ -68,15 +69,23 @@ def submit(payload: dict, config: Config) -> str:
     Returns:
         str: The response text from the backend
     """
-    query_endpoint = f"{config.backend.endpoint}/infer"
+    backend_format = config.backend.backend_format
+    if backend_format == "openai":
+        query_endpoint = f"{config.backend.endpoint}/chat/completions"
+        request_payload = to_openai_payload(payload, config)
+    else:
+        query_endpoint = f"{config.backend.endpoint}/infer"
+        request_payload = payload
 
     try:
-        response = _send_request(query_endpoint, payload, config)
+        response = _send_request(query_endpoint, request_payload, config)
         logger.info("Received response from LLM backend")
 
         if response.status_code != HTTPStatus.OK:
             _handle_error_response(response)
 
+        if backend_format == "openai":
+            return _extract_openai_response_text(response)
         return _extract_response_text(response)
     except RequestException as exc:
         logger.error("Failed to get response from AI: %s", exc)
@@ -84,12 +93,6 @@ def submit(payload: dict, config: Config) -> str:
             f"Communication error with the server: {str(exc)}. Please try again in a few minutes."
         ) from exc
     except OSError as exc:
-        # If the exception string contains the standard RHSM cert path, assume
-        # the system is not registered and raise a very specific error message.
-        if "/etc/pki/consumer/cert.pem" in str(exc):
-            raise RequestFailedError(
-                "The system must be registered to use RHEL Lightspeed. For cloud-based systems, see: https://access.redhat.com/articles/7127962"
-            ) from exc
         raise exc
 
 
@@ -148,6 +151,22 @@ def _handle_error_response(response: Response) -> None:
 
     logger.error("Status code: %s and message: %s", response.status_code, error_message)
     raise RequestFailedError(error_message)
+
+
+def _extract_openai_response_text(response: Response) -> str:
+    """Extract text from an OpenAI-compatible chat completions response.
+
+    Args:
+        response: Response object with JSON data
+
+    Returns:
+        Extracted assistant message content
+    """
+    try:
+        return from_openai_response(response.json())
+    except ValueError:
+        logger.warning("Response didn't contain valid JSON")
+        return response.text or ""
 
 
 def _extract_response_text(response: Response) -> str:
