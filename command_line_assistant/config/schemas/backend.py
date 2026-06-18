@@ -13,26 +13,23 @@ class AuthSchema:
     """Internal schema that represents the authentication for clad.
 
     Attributes:
-        cert_file (Path): The path to the RHSM certificate file
-        key_file (Path): The path to the RHSM key file
-        verify_ssl (bool): Flag to indicate if the ssl verification is necessary.
+        auth_type (str): Authentication type: "none", "cert", or "token".
+        cert_file (Path): Path to the certificate file (used when auth_type="cert").
+        key_file (Path): Path to the key file (used when auth_type="cert").
+        api_key (str): Bearer token (used when auth_type="token").
+        verify_ssl (bool): Whether to verify SSL certificates.
     """
 
-    cert_file: Path = Path("/etc/pki/consumer/cert.pem")
-    key_file: Path = Path("/etc/pki/consumer/key.pem")
+    auth_type: str = "none"
+    cert_file: Path = Path("")
+    key_file: Path = Path("")
+    api_key: str = ""
     verify_ssl: bool = True
 
     def __post_init__(self) -> None:
         """Post initialization method to normalize values"""
         self.cert_file = Path(self.cert_file).expanduser()
         self.key_file = Path(self.key_file).expanduser()
-
-        # TODO(r0x0d): Once we remove the depreaction notice, remove this as well.
-        if self.verify_ssl:
-            logger.info(
-                "Verify SSL option is deprecated and will be removed in the future."
-            )
-            logger.info("Ignoring Verify SSL option as it has no effect anymore.")
 
 
 @dataclasses.dataclass
@@ -44,17 +41,21 @@ class BackendSchema:
         proxies (dict[str, str]): Dictionary of proxies to route the request
         auth (Union[dict, AuthSchema]): The authentication information
         timeout (int): HTTP request timeout in seconds
+        backend_format (str): API format: "rhsm" for Red Hat Lightspeed, "openai" for OpenAI-compatible APIs.
+        model (str): Model name to use when backend_format="openai".
     """
 
-    endpoint: str = "https://0.0.0.0:8080"
+    endpoint: str = "http://localhost:11434/v1"
     auth: AuthSchema = dataclasses.field(default_factory=AuthSchema)
-    timeout: int = 30
+    timeout: int = 60
+    backend_format: str = "openai"
+    model: str = "llama3"
 
     proxies: dict[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
         """Post initialization method to normalize values"""
-        # Auth may be present in the config.toml. If it is not, we odn't do
+        # Auth may be present in the config.toml. If it is not, we don't do
         # anything and go with defaults.
         if isinstance(self.auth, dict):
             self.auth = AuthSchema(**self.auth)

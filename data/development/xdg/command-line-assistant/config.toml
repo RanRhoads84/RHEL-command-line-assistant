@@ -6,13 +6,17 @@ connection_string = "~/.local/state/command-line-assistant/history.db"
 enabled = true
 
 [backend]
-endpoint = "http://localhost:8000"
-timeout = 30
+# Ollama OpenAI-compatible endpoint (default Ollama port)
+endpoint = "http://localhost:11434/v1"
+timeout = 60
+backend_format = "openai"
+model = "llama3"
 # proxies = { http = "http://localhost:8002", https = "https://localhost:8002" }
 
 [backend.auth]
-cert_file = "data/development/certificate/fake-certificate.pem"
-key_file = "data/development/certificate/fake-key.pem"
+# auth_type: "none" (local), "token" (API key), or "cert" (mTLS / RHSM)
+auth_type = "none"
+verify_ssl = false
 
 [logging]
 level = "INFO"
