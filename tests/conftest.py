@@ -81,6 +81,28 @@ class MockPwnam:
 @pytest.fixture
 def mock_config(tmp_path):
     """Fixture to create a mock configuration"""
+    history_db = tmp_path / "history.db"
+
+    with patch("pwd.getpwnam", return_value=MockPwnam()):
+        return config.Config(
+            backend=BackendSchema(
+                endpoint="http://localhost",
+                backend_format="rhsm",
+                auth=AuthSchema(auth_type="none"),
+            ),
+            history=HistorySchema(
+                enabled=True,
+            ),
+            database=DatabaseSchema(type="sqlite", connection_string=history_db),
+            logging=LoggingSchema(
+                level="debug",
+            ),
+        )
+
+
+@pytest.fixture
+def mock_config_cert(tmp_path):
+    """Fixture for cert-based (RHSM) auth configuration"""
     cert_file = tmp_path / "cert.pem"
     key_file = tmp_path / "key.pem"
     history_db = tmp_path / "history.db"
@@ -91,15 +113,33 @@ def mock_config(tmp_path):
         return config.Config(
             backend=BackendSchema(
                 endpoint="http://localhost",
-                auth=AuthSchema(cert_file=cert_file, key_file=key_file),
+                backend_format="rhsm",
+                auth=AuthSchema(
+                    auth_type="cert", cert_file=cert_file, key_file=key_file
+                ),
             ),
-            history=HistorySchema(
-                enabled=True,
-            ),
+            history=HistorySchema(enabled=True),
             database=DatabaseSchema(type="sqlite", connection_string=history_db),
-            logging=LoggingSchema(
-                level="debug",
+            logging=LoggingSchema(level="debug"),
+        )
+
+
+@pytest.fixture
+def mock_config_openai(tmp_path):
+    """Fixture for OpenAI-compatible backend configuration"""
+    history_db = tmp_path / "history.db"
+
+    with patch("pwd.getpwnam", return_value=MockPwnam()):
+        return config.Config(
+            backend=BackendSchema(
+                endpoint="http://localhost:11434/v1",
+                backend_format="openai",
+                model="llama3",
+                auth=AuthSchema(auth_type="none"),
             ),
+            history=HistorySchema(enabled=True),
+            database=DatabaseSchema(type="sqlite", connection_string=history_db),
+            logging=LoggingSchema(level="debug"),
         )
 
 
