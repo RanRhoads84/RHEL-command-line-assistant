@@ -4,6 +4,7 @@ import pytest
 
 from command_line_assistant.constants import VERSION
 from command_line_assistant.daemon.http.session import get_session
+from command_line_assistant.config.schemas.backend import AuthSchema
 
 
 def test_session_headers(mock_config):
@@ -74,3 +75,55 @@ def test_session_with_proxies(proxies, mock_config):
     session = get_session(mock_config)
 
     assert session.proxies == proxies
+
+
+def test_session_no_auth(mock_config):
+    """No credentials are attached when auth_type is 'none'."""
+    mock_config.backend.auth = AuthSchema(auth_type="none")
+    session = get_session(mock_config)
+
+    assert session.cert is None
+    assert "Authorization" not in session.headers
+
+
+def test_session_token_auth(mock_config):
+    """Bearer token is injected when auth_type is 'token'."""
+    mock_config.backend.auth = AuthSchema(auth_type="token", api_key="sk-secret")
+    session = get_session(mock_config)
+
+    assert session.cert is None
+    assert session.headers.get("Authorization") == "Bearer sk-secret"
+
+
+def test_session_token_auth_empty_key(mock_config):
+    """No Authorization header when auth_type is 'token' but api_key is empty."""
+    mock_config.backend.auth = AuthSchema(auth_type="token", api_key="")
+    session = get_session(mock_config)
+
+    assert "Authorization" not in session.headers
+
+
+def test_session_cert_auth(mock_config_cert):
+    """Cert tuple is set when auth_type is 'cert'."""
+    session = get_session(mock_config_cert)
+
+    assert session.cert is not None
+    cert_path, key_path = session.cert
+    assert cert_path.name == "cert.pem"
+    assert key_path.name == "key.pem"
+
+
+def test_session_verify_ssl_false(mock_config):
+    """verify_ssl=False is passed through to the session."""
+    mock_config.backend.auth = AuthSchema(auth_type="none", verify_ssl=False)
+    session = get_session(mock_config)
+
+    assert session.verify is False
+
+
+def test_session_verify_ssl_true(mock_config):
+    """verify_ssl=True is passed through to the session."""
+    mock_config.backend.auth = AuthSchema(auth_type="none", verify_ssl=True)
+    session = get_session(mock_config)
+
+    assert session.verify is True

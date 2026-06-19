@@ -218,18 +218,14 @@ def test_handle_error_response_invalid_json(
         query.submit(default_payload, config=mock_config)
 
 
-def test_submit_with_rhsm_cert_oserror(mock_config, default_payload):
-    """Test that OSError with RHSM certificate path raises specific error message"""
-    # Mock the session to raise OSError with the specific path
+def test_submit_with_oserror_reraises(mock_config, default_payload):
+    """Test that OSError from the HTTP layer is re-raised as-is"""
     with patch("command_line_assistant.daemon.http.query.get_session") as mock_session:
         mock_session.return_value.__enter__.return_value.post.side_effect = OSError(
             "Could not read SSL certificate file: /etc/pki/consumer/cert.pem"
         )
 
-        with pytest.raises(
-            RequestFailedError,
-            match="The system must be registered to use RHEL Lightspeed. For cloud-based systems, see: https://access.redhat.com/articles/7127962",
-        ):
+        with pytest.raises(OSError, match="Could not read SSL certificate file"):
             query.submit(default_payload, config=mock_config)
 
 
