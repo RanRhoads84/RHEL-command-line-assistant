@@ -13,7 +13,8 @@
 	docs \
 	distribution-tarball \
 	html-docs \
-	release
+	release \
+	pkgbuild
 
 # Project directory path - /home/<user>/.../command-line-assistant
 PROJECT_DIR := $(shell pwd)
@@ -91,7 +92,6 @@ clean: ## Clean project files
 	   dist \
 	   $(PKGNAME)-$(VERSION).tar.gz
 	$(MAKE) -C docs clean
-	$(MAKE) -C data/release/selinux
 
 link-systemd-units: ## Link the systemd units to ~/.config/systemd/user
 	@echo "Linking the systemd units from $(CLAD_SYSTEMD_DEVEL_PATH) to $(SYSTEMD_USER_UNITS)/clad.service"
@@ -175,6 +175,14 @@ release: ## Interactively bump the version (major, minor, or patch)
 	esac; \
 	echo "Bumping version to $$new_version"; \
 	python scripts/prepare_release.py $$new_version
+
+pkgbuild: clean ## Build Arch Linux package (requires makepkg)
+	@echo "Building Arch Linux package..."
+	@command -v makepkg > /dev/null || { echo >&2 "makepkg not found. Install base-devel on Arch Linux."; exit 1; }
+	@cp packaging/PKGBUILD .
+	@makepkg -sf
+	@rm -f PKGBUILD
+	@echo "Package built. Install with: sudo pacman -U $(PKGNAME)-$(VERSION)-*.pkg.tar.zst"
 
 build-container: ## Build a container image
 	podman build -t rhel-ligspeed/command-line-assistant:latest .
